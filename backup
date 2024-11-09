@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Toya Education System</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Toya Education System</h1>
+
+        <div class="main-content">
+            <!-- Updated container to show the GIF instead of a video -->
+            <div class="video-container">
+                <img src="/static/haile-unscreen.gif" alt="Avatar GIF" class="gif-image">
+            </div>
+
+            <!-- Chatbox for displaying messages -->
+            <div class="chatbox" id="chatbox"></div>
+        </div>
+
+        <!-- Input container for user name -->
+        <div class="input-container">
+            <input type="text" id="userInput" class="user-input" placeholder="Enter your name here..." />
+            <button class="ask-button" id="askNameButton">Submit Name</button>
+        </div>
+
+        <!-- Input container for user question -->
+        <div class="input-container" id="questionInputContainer" style="display: none;">
+            <input type="text" id="questionInput" class="user-input" placeholder="Type your question here..." />
+            <button class="ask-button" onclick="askQuestion()">Ask</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+    <script>
+        // Initialize greeting when the page loads
+        window.onload = initializeGreeting;
+
+        // Function to handle user name submission
+        document.getElementById('askNameButton').addEventListener('click', handleUserName);
+
+        async function initializeGreeting() {
+            await playElevenLabsVoice("Welcome to my world, what is your name?");
+        }
+
+        async function handleUserName() {
+            const userInput = document.getElementById('userInput');
+            const chatbox = document.getElementById('chatbox');
+            const userName = userInput.value;
+
+            if (userName.trim() === "") return;
+
+            // Display user name in the chatbox
+            chatbox.innerHTML += `<div class="user-message">You: ${userName}</div>`;
+
+            // Respond with a welcome message including the user's name
+            await playElevenLabsVoice(`Welcome ${userName}, Welcome to my world. Please ask your question.`);
+            chatbox.innerHTML += `<div class="bot-message">Toya: Welcome ${userName}, Welcome to my world. Please ask your question.</div>`;
+
+            // Scroll chatbox to the bottom
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            // Show the question input and hide the name input
+            document.querySelector('.input-container').style.display = 'none';
+            document.getElementById('questionInputContainer').style.display = 'block';
+
+            // Clear user input
+            userInput.value = "";
+        }
+
+        async function askQuestion() {
+            const userInput = document.getElementById('questionInput');
+            const chatbox = document.getElementById('chatbox');
+            const prompt = userInput.value;
+
+            if (prompt.trim() === "") return;
+
+            // Display user input in the chatbox
+            chatbox.innerHTML += `<div class="user-message">You: ${prompt}</div>`;
+
+            try {
+                // Send request to the server for response text
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+
+                const data = await response.json();
+                const answer = data.answer;
+
+                // Fetch and play the voice before displaying the text response
+                await playElevenLabsVoice(answer);
+
+                // Display response in the chatbox after voice starts
+                chatbox.innerHTML += `<div class="bot-message">Toya: ${answer}</div>`;
+
+                // Scroll chatbox to the bottom
+                chatbox.scrollTop = chatbox.scrollHeight;
+
+            } catch (error) {
+                chatbox.innerHTML += `<div class="bot-message">Error: ${error}</div>`;
+            }
+
+            // Clear question input
+            userInput.value = "";
+        }
+
+        // Function to fetch audio from Eleven Labs API and play it
+        async function playElevenLabsVoice(text) {
+            const apiKey = 'sk_5ee90966b42aa797217035ffb4acfd3b47e60e4e5a7b6ea7';  // Don't hardcode API keys in production
+            const voiceId = 'MF3mGyEYCl7XYWbV9V6O';  // Replace with your actual voice ID
+
+            try {
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'xi-api-key': apiKey
+                    },
+                    body: JSON.stringify({
+                        text,
+                        voice_settings: {
+                            stability: 0.5,
+                            similarity_boost: 0.75
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error from Eleven Labs API: ${response.statusText}`);
+                }
+
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                // Play audio, return a promise to wait until audio starts playing
+                await new Promise((resolve) => {
+                    audio.oncanplaythrough = resolve;
+                    audio.play();
+                });
+            } catch (error) {
+                console.error("Failed to play Eleven Labs voice:", error);
+            }
+        }
+    </script>
+</body>
+</html>
